@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {TweenLite, Circ} from 'gsap';
+import {TweenLite, Expo} from 'gsap';
 
 interface Point {
     x: number;
@@ -8,10 +8,10 @@ interface Point {
     originY: number;
     circle: Circle;
     active: number;
-    closest: Point[] | [];
+    closest: Point[] | any[];
 }
 
-const getColor = (opacity: number) => `rgba(185, 165, 255, ${opacity})`;
+const getColor = (opacity: number) => `rgba(166, 103, 248, ${opacity})`;
 
 class Circle {
     public active: number;
@@ -43,6 +43,10 @@ class ParticleHeader extends React.PureComponent<any> {
         this.animateHeader = true;
     }
 
+    shouldComponentUpdate() {
+        return false;
+    }
+
     componentDidMount() {
         this.initHeader();
         this.initAnimation();
@@ -51,7 +55,6 @@ class ParticleHeader extends React.PureComponent<any> {
 
 
     initHeader = () => {
-
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         this.target = {x: this.width / 2, y: this.height / 2};
@@ -104,7 +107,7 @@ class ParticleHeader extends React.PureComponent<any> {
 
         // assign a circle to each point
         for (let i in this.points) {
-            let c = new Circle(this.points[i], 2 + Math.random() * 2, 'rgba(255,255,255,0.3)');
+            let c = new Circle(this.points[i], 2 + Math.random() * 2, 'rgba(166, 103, 248, 1)');
             this.points[i].circle = c;
         }
     };
@@ -119,18 +122,9 @@ class ParticleHeader extends React.PureComponent<any> {
     };
 
     mouseMove = (e: MouseEvent) => {
-        let posx = 0;
-        let posy = 0;
-        if (e.pageX || e.pageY) {
-            posx = e.pageX;
-            posy = e.pageY;
-        }
-        else if (e.clientX || e.clientY)    {
-            posx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-            posy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-        }
-        this.target.x = posx;
-        this.target.y = posy;
+        const eventPos = (e.pageX || e.pageY);
+        this.target.x =  eventPos ? e.pageX : e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+        this.target.y = eventPos ? e.pageY: e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
     };
 
     scrollCheck = () => {
@@ -140,7 +134,6 @@ class ParticleHeader extends React.PureComponent<any> {
     resize = () => {
         this.width = window.innerWidth;
         this.height = window.innerHeight;
-        // this.largeHeader.style.height = height+'px';
         this.canvas.width = this.width;
         this.canvas.height = this.height;
     };
@@ -158,18 +151,19 @@ class ParticleHeader extends React.PureComponent<any> {
             this.ctx.clearRect(0, 0, this.width, this.height);
             for (let i in this.points) {
                 // detect points in range
-                if (Math.abs(this.getDistance(this.target, this.points[i])) < 4000) {
-                    this.points[i].active = 0.3;
-                    this.points[i].circle.active = 0.6;
-                } else if (Math.abs(this.getDistance(this.target, this.points[i])) < 20000) {
-                    this.points[i].active = 0.1;
-                    this.points[i].circle.active = 0.3;
-                } else if (Math.abs(this.getDistance(this.target, this.points[i])) < 40000) {
-                    this.points[i].active = 0.02;
-                    this.points[i].circle.active = 0.3;
+                const distance = Math.abs(this.getDistance(this.target, this.points[i]));
+                if (distance < 4510) {
+                    this.points[i].active = 1;
+                    this.points[i].circle.active = 1;
+                } else if (distance < 30902) {
+                    this.points[i].active = 0.618;
+                    this.points[i].circle.active = 0.618;
+                } else if (distance < 50000) {
+                    this.points[i].active = 0.381;
+                    this.points[i].circle.active = 0.381;
                 } else {
-                    this.points[i].active = 0.0;
-                    this.points[i].circle.active = 0.3;
+                    this.points[i].active = 0;
+                    this.points[i].circle.active = 0.236;
                 }
 
                 this.drawLines(this.points[i]);
@@ -179,14 +173,19 @@ class ParticleHeader extends React.PureComponent<any> {
         requestAnimationFrame(this.animate);
     };
 
-    shiftPoint = (p: any) => {
-        TweenLite.to(p, 1 + 5 * Math.random(),
+    shiftPoint = async (p: Point) => {
+        if (p.active > 0) {
+            TweenLite.to(p, this.clamp(5, 20)(10 * Math.random()),
             {
-                x: p.originX - 50 + (Math.random() * 250),
-                y: p.originY - 50 + (Math.random() * 250),
-                ease: Circ.easeInOut,
+                x: p.originX - 50 + Math.random() * 250,
+                y: p.originY - 50 + Math.random() * 250,
+                ease: Expo.easeInOut,
                 onComplete: () => this.shiftPoint(p)
-            });
+            })
+        } else {
+            await setTimeout(this.shiftPoint, 250, p);
+        }
+
     };
 
     // Canvas manipulation
@@ -201,14 +200,17 @@ class ParticleHeader extends React.PureComponent<any> {
         }
     };
 
+    clamp = (min: number, max: number) => (value: number) =>
+        value < min ? min : value > max ? max : value;
     // Util
     getDistance = (p1: { x: number, y: number }, p2: { x: number, y: number }) => {
-        return Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
+        return (Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
     };
+
 
     render() {
         return (
-            <canvas style={{zIndex: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}} ref="canvas"></canvas>
+            <canvas style={{zIndex: -10, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}} ref="canvas"></canvas>
         )
     }
 }
